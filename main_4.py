@@ -5,20 +5,30 @@ import re
 
 
 async def update_plot(api, ax, ydata, line, value_text, interval):
+    sample_counter = 0  # Track the total number of readings
+    max_points = ydata.maxlen
     while True:
         telegram = await api.telegram()
         import_kw, export_kw = parse_telegram_power(telegram)
         household_consumption_kw = import_kw + export_kw
         household_consumption_w = household_consumption_kw * 1000.0
         ydata.append(household_consumption_w)
-        line.set_data(range(len(ydata)), list(ydata))
-        # x-axis stays fixed, only y-axis auto-scales
+        # Use the sample_counter for x-axis
+        if len(ydata) < max_points:
+            xdata = list(range(sample_counter - len(ydata) + 1, sample_counter + 1))
+            ax.set_xlim(0, max_points - 1)
+        else:
+            xdata = list(range(sample_counter - max_points + 1, sample_counter + 1))
+            ax.set_xlim(sample_counter - max_points + 1, sample_counter)
+        line.set_data(xdata, list(ydata))
+        # Auto-scale y-axis
         ax.relim()
         ax.autoscale_view()
         # Update the value display
         value_text.set_text(f"Current: {household_consumption_w:.1f} W")
         ax.figure.canvas.draw()
         ax.figure.canvas.flush_events()
+        sample_counter += 1
         await asyncio.sleep(interval)
 
 def parse_telegram_power(telegram: str):
